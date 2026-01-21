@@ -1,0 +1,55 @@
+# nginx proxy address - http://172.17.0.1:8092
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "5m"
+    max-file: "1"
+
+services:
+  activepieces:
+    image: activepieces/activepieces:latest
+    container_name: activepieces-app
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - activepieces
+    ports:
+      - "8092:80"
+    environment:
+      TZ: ${TZ:-America/New_York}
+      DATABASE_URL: postgres://${DB_USER_NAME:-activepieces}:${DB_USER_PASS:-changeme_db_password}@activepieces-db:5432/${DB_CREATE_DATABASE_NAME:-activepieces}
+    volumes:
+      - ./rootfs/data/activepieces:/data
+      - ./rootfs/config/activepieces:/config
+    depends_on:
+      - activepieces-db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  activepieces-db:
+    image: postgres:16-alpine
+    container_name: activepieces-db
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - activepieces
+    environment:
+      TZ: ${TZ:-America/New_York}
+      POSTGRES_DB: ${DB_CREATE_DATABASE_NAME:-activepieces}
+      POSTGRES_USER: ${DB_USER_NAME:-activepieces}
+      POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
+    volumes:
+      - ./rootfs/db/postgres/activepieces:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  activepieces:
+    external: false
