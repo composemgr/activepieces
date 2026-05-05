@@ -51,9 +51,9 @@ See `docker-compose.yaml` for complete list of configurable options.
 
 ## 📂 Volumes
 
-- `./rootfs/data/activepieces` - Data storage
-- `./rootfs/config/activepieces` - Data storage
-- `./rootfs/data/db/postgres/activepieces` - Data storage
+- `./volumes/data/activepieces` - Data storage
+- `./volumes/config/activepieces` - Data storage
+- `./volumes/data/db/postgres/activepieces` - Data storage
 
 ## 🔐 Security
 
