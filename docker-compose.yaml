@@ -1,5 +1,6 @@
 # nginx proxy address - http://172.17.0.1:8092
 
+name: activepieces
 x-logging: &default-logging
   driver: json-file
   options:
@@ -9,21 +10,30 @@ x-logging: &default-logging
 services:
   activepieces:
     image: activepieces/activepieces:latest
+    pull_policy: always
     container_name: activepieces-app
-    restart: unless-stopped
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    restart: always
     logging: *default-logging
     networks:
       - activepieces
     ports:
-      - "8092:80"
+      - "172.17.0.1:8092:80"
     environment:
       TZ: ${TZ:-America/New_York}
-      DATABASE_URL: postgres://${DB_USER_NAME:-activepieces}:${DB_USER_PASS:-changeme_db_password}@activepieces-db:5432/${DB_CREATE_DATABASE_NAME:-activepieces}
+      AP_ENCRYPTION_KEY: ${ENCRYPTION_KEY:-changeme_encryption_key_min_32_chars}
+      AP_JWT_SECRET: ${APP_SECRET_KEY:-changeme_secret_key_min_32_chars}
+      AP_FRONTEND_URL: https://${BASE_HOST_NAME:-$HOSTNAME}
+      AP_POSTGRES_DATABASE: ${DB_CREATE_DATABASE_NAME:-activepieces}
+      AP_POSTGRES_USERNAME: ${DB_USER_NAME:-activepieces}
+      AP_POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
+      AP_POSTGRES_HOST: activepieces-db
+      AP_POSTGRES_PORT: 5432
     volumes:
-      - ./volumes/data/activepieces:/data
-      - ./volumes/config/activepieces:/config
+      - ./volumes/data/activepieces:/root/.activepieces
     depends_on:
-      - activepieces-db
+      activepieces-db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 30s
@@ -31,9 +41,11 @@ services:
       retries: 3
 
   activepieces-db:
-    image: postgres:16-alpine
+    image: postgres:latest
+    pull_policy: always
     container_name: activepieces-db
-    restart: unless-stopped
+    hostname: activepieces-db
+    restart: always
     logging: *default-logging
     networks:
       - activepieces
