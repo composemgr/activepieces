@@ -15,12 +15,32 @@ services:
     hostname: ${BASE_HOST_NAME:-$HOSTNAME}
     restart: always
     logging: *default-logging
+    labels:
+      - 'traefik.enable=true'
+      - 'cloudflare.enable=true'
+      - 'traefik.docker.network=proxy'
+      - 'cloudflare.service=http://activepieces-app:80'
+      - 'cloudflare.hostname=activepieces.${CLOUDFLARE_ZONE_NAME:-}'
+      - 'traefik.http.routers.activepieces-app.entrypoints=http'
+      - 'traefik.http.routers.activepieces-app-secure.tls=true'
+      - 'traefik.http.routers.activepieces-app.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.middlewares.activepieces-app-https-redirect.redirectscheme.scheme=https'
+      - 'traefik.http.routers.activepieces-app.middlewares=activepieces-app-https-redirect'
+      - 'traefik.http.routers.activepieces-app-secure.entrypoints=https'
+      - 'traefik.http.routers.activepieces-app-secure.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.routers.activepieces-app-secure.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.activepieces-app-secure.service=activepieces-app'
+      - 'traefik.http.services.activepieces-app.loadbalancer.server.port=80'
     networks:
       - activepieces
+      - proxy
+      - cloudflare
     ports:
       - "172.17.0.1:8092:80"
     environment:
       TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: activepieces-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
       AP_ENCRYPTION_KEY: ${ENCRYPTION_KEY:-changeme_encryption_key_min_32_chars}
       AP_JWT_SECRET: ${APP_SECRET_KEY:-changeme_secret_key_min_32_chars}
       AP_FRONTEND_URL: https://${BASE_HOST_NAME:-$HOSTNAME}
@@ -51,6 +71,7 @@ services:
       - activepieces
     environment:
       TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: activepieces-db
       POSTGRES_DB: ${DB_CREATE_DATABASE_NAME:-activepieces}
       POSTGRES_USER: ${DB_USER_NAME:-activepieces}
       POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
@@ -65,3 +86,7 @@ services:
 networks:
   activepieces:
     external: false
+  proxy:
+    external: true
+  cloudflare:
+    external: true
