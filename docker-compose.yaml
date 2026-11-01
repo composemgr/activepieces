@@ -1,116 +1,98 @@
-# nginx proxy address - http://172.17.0.1:8092
+# nginx proxy address - http://172.17.0.1:64101
 
 name: activepieces
 x-logging: &default-logging
-  driver: json-file
   options:
-    max-size: "5m"
-    max-file: "1"
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
 
 services:
-  activepieces:
+  app:
     image: activepieces/activepieces:latest
-    pull_policy: always
     container_name: activepieces-app
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
     hostname: ${BASE_HOST_NAME:-$HOSTNAME}
     restart: always
+    pull_policy: always
     logging: *default-logging
-    labels:
-      - 'traefik.enable=true'
-      - 'cloudflare.enable=true'
-      - 'traefik.docker.network=proxy'
-      - 'cloudflare.service=http://activepieces-app:80'
-      - 'cloudflare.hostname=activepieces.${CLOUDFLARE_ZONE_NAME:-}'
-      - 'traefik.http.routers.activepieces-app.entrypoints=http'
-      - 'traefik.http.routers.activepieces-app-secure.tls=true'
-      - 'traefik.http.routers.activepieces-app.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
-      - 'traefik.http.middlewares.activepieces-app-https-redirect.redirectscheme.scheme=https'
-      - 'traefik.http.routers.activepieces-app.middlewares=activepieces-app-https-redirect'
-      - 'traefik.http.routers.activepieces-app-secure.entrypoints=https'
-      - 'traefik.http.routers.activepieces-app-secure.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
-      - 'traefik.http.routers.activepieces-app-secure.tls.certresolver=cloudflare'
-      - 'traefik.http.routers.activepieces-app-secure.service=activepieces-app'
-      - 'traefik.http.services.activepieces-app.loadbalancer.server.port=80'
-    networks:
-      - activepieces
-      - proxy
-      - cloudflare
-    ports:
-      - "172.17.0.1:8092:80"
     environment:
       TZ: ${TZ:-America/New_York}
       CONTAINER_NAME: activepieces-app
       HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
+      AP_FRONTEND_URL: https://${BASE_HOST_NAME:-$HOSTNAME}
       AP_ENCRYPTION_KEY: ${ENCRYPTION_KEY:-changeme_encryption_key_min_32_chars}
       AP_JWT_SECRET: ${APP_SECRET_KEY:-changeme_secret_key_min_32_chars}
-      AP_FRONTEND_URL: https://${BASE_HOST_NAME:-$HOSTNAME}
-      AP_POSTGRES_DATABASE: ${DB_CREATE_DATABASE_NAME:-activepieces}
-      AP_POSTGRES_USERNAME: ${DB_USER_NAME:-activepieces}
-      AP_POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
       AP_POSTGRES_HOST: activepieces-db
       AP_POSTGRES_PORT: 5432
+      AP_POSTGRES_DATABASE: ${DB_CREATE_DATABASE_NAME:-activepieces}
+      AP_POSTGRES_USERNAME: ${DB_USER_NAME:-activepieces}
+      AP_POSTGRES_PASSWORD: ${DB_USER_PASS:-replace-with-a-random-password}
       AP_REDIS_HOST: activepieces-redis
       AP_REDIS_PORT: 6379
+    ports:
+      - '172.17.0.1:64101:80'
     volumes:
-      - ./volumes/data/activepieces:/root/.activepieces
+      - './volumes/data/activepieces:/root/.activepieces'
     depends_on:
-      activepieces-db:
+      db:
         condition: service_healthy
-      activepieces-redis:
+      redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:80']
       interval: 30s
       timeout: 10s
       retries: 3
-
-  activepieces-db:
-    image: postgres:latest
-    pull_policy: always
-    container_name: activepieces-db
-    hostname: activepieces-db
-    restart: always
-    logging: *default-logging
     networks:
       - activepieces
+
+  db:
+    image: postgres:16-alpine
+    container_name: activepieces-db
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: activepieces-db
+    restart: always
+    pull_policy: always
+    logging: *default-logging
     environment:
       TZ: ${TZ:-America/New_York}
       CONTAINER_NAME: activepieces-db
       POSTGRES_DB: ${DB_CREATE_DATABASE_NAME:-activepieces}
       POSTGRES_USER: ${DB_USER_NAME:-activepieces}
-      POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
+      POSTGRES_PASSWORD: ${DB_USER_PASS:-replace-with-a-random-password}
     volumes:
-      - ./volumes/data/db/postgres/activepieces:/var/lib/postgresql/data
+      - './volumes/db/postgres/activepieces:/var/lib/postgresql/data:z'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
       interval: 30s
       timeout: 10s
       retries: 3
-
-  activepieces-redis:
-    image: redis:alpine
-    pull_policy: always
-    container_name: activepieces-redis
-    hostname: activepieces-redis
-    restart: always
-    logging: *default-logging
     networks:
       - activepieces
+
+  redis:
+    image: redis:alpine
+    container_name: activepieces-redis
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: activepieces-redis
+    restart: always
+    pull_policy: always
+    logging: *default-logging
     environment:
       TZ: ${TZ:-America/New_York}
       CONTAINER_NAME: activepieces-redis
     volumes:
-      - ./volumes/data/db/redis/activepieces:/data
+      - './volumes/cache/redis/activepieces:/data'
     healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      test: ['CMD', 'redis-cli', '--raw', 'incr', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - activepieces
 
 networks:
   activepieces:
+    name: activepieces
     external: false
-  proxy:
-    external: true
-  cloudflare:
-    external: true

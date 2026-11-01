@@ -4,16 +4,18 @@ Open-source business automation platform with visual workflow builder
 
 ## 📋 Description
 
-Open-source business automation platform with visual workflow builder
+Open-source business automation platform with visual workflow builder. The
+server listens on native port `80` and uses PostgreSQL for application data
+and Redis for queueing and caching.
 
 ## 🚀 Services
 
-- **activepieces**: activepieces/activepieces:latest
+- **app**: activepieces/activepieces:latest
 
 ### Infrastructure Components
 
-- **activepieces-db**: Postgres database
-
+- **db**: Postgres database
+- **redis**: Redis cache and queue
 
 ## 📦 Installation
 
@@ -26,7 +28,8 @@ curl -q -LSsf "https://raw.githubusercontent.com/composemgr/activepieces/main/do
 ```bash
 git clone "https://github.com/composemgr/activepieces" ~/.local/srv/docker/activepieces
 cd ~/.local/srv/docker/activepieces
-docker compose up -d
+cp default.env .env
+docker compose --env-file .env up -d
 ```
 
 ### Option 3: Using composemgr
@@ -41,19 +44,55 @@ composemgr install activepieces
 ```shell
 TZ=America/New_York
 DB_USER_NAME=activepieces
+DB_USER_PASS=replace-with-a-random-password
+ENCRYPTION_KEY=replace-with-a-random-32-byte-hex-string
+APP_SECRET_KEY=replace-with-a-random-32-byte-hex-string
 ```
 
 See `docker-compose.yaml` for complete list of configurable options.
 
+### Environment Files
+
+`default.env.sample` holds the full set of variables and is copied to `.env`
+before starting the stack:
+
+```bash
+cp default.env .env
+docker compose --env-file .env up -d
+```
+
+`app.env.sample` holds the app-specific overrides and is copied to `app.env`:
+
+```bash
+cp app.env.sample app.env
+```
+
+`composemgr up` applies `app.env` and `default.env` automatically. Raw
+`docker compose` commands need `--env-file .env` to pick up the same values.
+
+### Reverse Proxy
+
+Three standalone compose files ship in this repo:
+
+| File | Use |
+|------|-----|
+| `docker-compose.yaml` | Default, published on `172.17.0.1:64101` |
+| `docker-compose.traefik.yaml` | Behind an existing external `traefik` network |
+| `docker-compose.tunnel.yaml` | Behind an existing external `cloudflare` tunnel network |
+
+```bash
+docker compose -f docker-compose.traefik.yaml --env-file .env up -d
+```
+
 ## 🌐 Access
 
-- **Web Interface**: http://172.17.0.1:8092
+- **Web Interface**: http://172.17.0.1:64101
 
 ## 📂 Volumes
 
-- `./volumes/data/activepieces` - Data storage
-- `./volumes/config/activepieces` - Data storage
-- `./volumes/data/db/postgres/activepieces` - Data storage
+- `./volumes/data/activepieces` - Application data
+- `./volumes/db/postgres/activepieces` - Database data
+- `./volumes/cache/redis/activepieces` - Redis data
 
 ## 🔐 Security
 
@@ -66,26 +105,26 @@ See `docker-compose.yaml` for complete list of configurable options.
 ## 🔍 Logging
 
 ```shell
-docker compose logs -f activepieces
+docker compose --env-file .env logs -f app
 ```
 
 ## 🛠️ Management
 
 ```bash
 # Start services
-docker compose up -d
+docker compose --env-file .env up -d
 
 # Stop services
-docker compose down
+docker compose --env-file .env down
 
 # Update to latest images
-docker compose pull && docker compose up -d
+docker compose --env-file .env pull && docker compose --env-file .env up -d
 
 # View logs
-docker compose logs -f
+docker compose --env-file .env logs -f
 
 # Restart services
-docker compose restart
+docker compose --env-file .env restart
 ```
 
 ## 📋 Requirements
